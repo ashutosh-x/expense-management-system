@@ -1,7 +1,7 @@
-import fastapi as fastApi
+from fastapi import APIRouter, HTTPException
 import app.schemas.expense as schema_expense
 
-router = fastApi.APIRouter(prefix="/expenses", tags=["Expense"])
+router = APIRouter(prefix="/expenses", tags=["Expense"])
 expense_id_counter = 1
 expenses = []
 
@@ -26,7 +26,7 @@ def getExpense(expense_id: int):
     for expense in expenses:
         if expense_id == expense["id"]:
             return expense
-    raise fastApi.HTTPException(status_code=404, detail="Not found")
+    raise HTTPException(status_code=404, detail="Not found")
 
 @router.put("/updateExpense/{expense_id}")
 def updateExpense(expense_id: int, updated_expense: schema_expense.ExpenseCreate):
@@ -37,4 +37,11 @@ def updateExpense(expense_id: int, updated_expense: schema_expense.ExpenseCreate
                 **updated_expense.model_dump(mode="json")
             }
             return expenses[index]
-    raise fastApi.HTTPException(status_code=404, detail="Expense not found")
+    raise HTTPException(status_code=404, detail="Expense not found")
+
+@router.delete("/deleteExpense/{expense_id}")
+def delete_expense(expense_id: int):
+    for index, expense in enumerate(expenses):
+        if expense["id"] == expense_id:
+            return expenses.pop(index)
+    raise HTTPException(status_code=404, detail="Expense not found")
