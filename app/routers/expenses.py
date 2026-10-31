@@ -1,47 +1,79 @@
-from fastapi import APIRouter, HTTPException
-import app.schemas.expense as schema_expense
+from fastapi import APIRouter, HTTPException, Depends
+from app.schemas.expense import ExpenseCreate, ExpenseResponse
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models.expense import Expense
 
 router = APIRouter(prefix="/expenses", tags=["Expense"])
-expense_id_counter = 1
-expenses = []
 
-@router.post("/createExpense")
-def create_expense(expense: schema_expense.ExpenseCreate):
-    global expense_id_counter
-
-    new_expense = {
-        "id": expense_id_counter,
-        **expense.model_dump(mode="json"),
-    }
-    expenses.append(new_expense)
-    expense_id_counter += 1
+@router.post("/createExpense", response_model=ExpenseResponse)
+def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
+    new_expense = Expense(**expense.model_dump())
+    db.add(new_expense)
+    db.commit()
+    db.refresh(new_expense)
     return new_expense
 
 @router.get("/getAllExpense")
-def getAllExpenses():
-    return expenses
+def getAllExpenses(db: Session = Depends(get_db)):
+    return db.query(Expense).all()
 
 @router.get("/getExpense/{expense_id}")
-def getExpense(expense_id: int):
-    for expense in expenses:
-        if expense_id == expense["id"]:
-            return expense
-    raise HTTPException(status_code=404, detail="Not found")
+def getExpense(expense_id: int, db: Session = Depends(get_db)):
+    expense = db.query(Expense).filter(
+        Expense.id == expense_id
+    ).first()
+
+    if expense is None:
+        raise HTTPException(
+            status_code=404, detail="Expense not found"
+        )
+    return expense
 
 @router.put("/updateExpense/{expense_id}")
-def updateExpense(expense_id: int, updated_expense: schema_expense.ExpenseCreate):
-    for index, expense in enumerate(expenses):
-        if expense_id == expense["id"]:
-            expenses[index] = {
-                "id": expense_id,
-                **updated_expense.model_dump(mode="json")
-            }
-            return expenses[index]
-    raise HTTPException(status_code=404, detail="Expense not found")
+def updateExpense(
+    expense_id: int,
+    updated_expense: ExpenseCreate,
+    db: Session = Depends(get_db)):
+
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+
+    if expense is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Expense not found")
+    
+    expense.amount = updated_expense.amount
+    expense.category = updated_expense.category
+    expense.description = updated_expense.description
+    expense.time = updated_expense.time
+
+    db.commit()
+    db.refresh(expense)
+    return expense
 
 @router.delete("/deleteExpense/{expense_id}")
-def delete_expense(expense_id: int):
-    for index, expense in enumerate(expenses):
-        if expense["id"] == expense_id:
-            return expenses.pop(index)
-    raise HTTPException(status_code=404, detail="Expense not found")
+def delete_expense(
+    expense_id: int,
+    db: Session = Depends(get_db)):
+
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    
+    if expense is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Expense not found")
+
+    db.delete(expense)
+    db.commit()
+    return expense
+
+@router.delete("/deleteAllExpenses")
+def delete_all_expense(
+    db: Session = Depends(get_db)):
+
+    deleted_count = db.query(Expense).delete()
+    db.commit()
+    return {
+        "message": f"All {deleted_count} expenses deleted"
+    }
