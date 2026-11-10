@@ -62,7 +62,7 @@ def test_create_expense(client):
         "time": "2026-10-27"
     }
     response = client.post("/expenses/createExpense", json=expense_body)
-    assert response.status_code == 200
+    assert response.status_code == 201
 
     data = response.json()
     assert data["id"] is not None
@@ -119,7 +119,7 @@ def test_delete_expense(client):
     assert delete_expense_response.status_code == 200
     assert delete_expense_response.json() == {
         "id": expense_id,
-        "amount": 136.0,
+        "amount": "136.00",
         "category": "Cab - deleted record",
         "description": "Travel expense for deletion",
         "time": "2026-10-27"

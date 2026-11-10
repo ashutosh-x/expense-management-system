@@ -1,79 +1,49 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from app.schemas.expense import ExpenseCreate, ExpenseResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.expense import Expense
+from app.services.expenses import (create_expense_service, get_expense_by_id_service,
+        get_all_expenses_service, update_expense_service,delete_expense_service, delete_all_expenses_service)
 
 router = APIRouter(prefix="/expenses", tags=["Expense"])
 
-@router.post("/createExpense", response_model=ExpenseResponse)
+@router.post("/createExpense", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
-    new_expense = Expense(**expense.model_dump())
-    db.add(new_expense)
-    db.commit()
-    db.refresh(new_expense)
-    return new_expense
+    return create_expense_service(expense, db)
 
-@router.get("/getAllExpense")
-def getAllExpenses(db: Session = Depends(get_db)):
-    return db.query(Expense).all()
-
-@router.get("/getExpense/{expense_id}")
-def getExpense(expense_id: int, db: Session = Depends(get_db)):
-    expense = db.query(Expense).filter(
-        Expense.id == expense_id
-    ).first()
-
+@router.get("/getExpense/{expense_id}", response_model=ExpenseResponse)
+def get_expense(expense_id: int, db: Session = Depends(get_db)):
+    expense = get_expense_by_id_service(expense_id, db)
     if expense is None:
         raise HTTPException(
             status_code=404, detail="Expense not found"
         )
     return expense
 
-@router.put("/updateExpense/{expense_id}")
-def updateExpense(
-    expense_id: int,
-    updated_expense: ExpenseCreate,
-    db: Session = Depends(get_db)):
+@router.get("/getAllExpense", response_model=list[ExpenseResponse])
+def get_all_expenses(db: Session = Depends(get_db)):
+    return get_all_expenses_service(db)
 
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
-
+@router.put("/updateExpense/{expense_id}", response_model=ExpenseResponse)
+def update_expense(expense_id: int, updated_expense: ExpenseCreate, db: Session = Depends(get_db)):
+    expense = update_expense_service(expense_id, updated_expense, db)
     if expense is None:
         raise HTTPException(
             status_code=404,
             detail="Expense not found")
-    
-    expense.amount = updated_expense.amount
-    expense.category = updated_expense.category
-    expense.description = updated_expense.description
-    expense.time = updated_expense.time
-
-    db.commit()
-    db.refresh(expense)
     return expense
 
-@router.delete("/deleteExpense/{expense_id}")
-def delete_expense(
-    expense_id: int,
-    db: Session = Depends(get_db)):
-
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    
+@router.delete("/deleteExpense/{expense_id}",response_model=ExpenseResponse)
+def delete_expense(expense_id: int, db: Session = Depends(get_db)):
+    expense = delete_expense_service(expense_id, db)
     if expense is None:
         raise HTTPException(
             status_code=404,
             detail="Expense not found")
-
-    db.delete(expense)
-    db.commit()
     return expense
 
 @router.delete("/deleteAllExpenses")
-def delete_all_expense(
-    db: Session = Depends(get_db)):
-
-    deleted_count = db.query(Expense).delete()
-    db.commit()
+def delete_all_expense(db: Session = Depends(get_db)):
     return {
-        "message": f"All {deleted_count} expenses deleted"
+        "message": f"All {delete_all_expenses_service(db)} expenses deleted"
     }
