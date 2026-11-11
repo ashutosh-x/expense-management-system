@@ -6,6 +6,10 @@ from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from decimal import Decimal
+from unittest.mock import MagicMock
+from datetime import date
+from app.services.expenses import create_expense_service
+from app.schemas.expense import ExpenseCreate
 
 TEST_DATABASE_URL = "sqlite://"
 
@@ -209,3 +213,18 @@ def test_delete_expense_not_found(client):
 
 def create_test_expense(client, expense_body):
     return client.post("/expenses/createExpense", json=expense_body)
+
+def test_create_expense_rollback_on_commit_failure():
+    db = MagicMock()
+    db.commit.side_effect = Exception("Simulated Database Failure")
+    expense = ExpenseCreate(
+        amount=100,
+        category="Food",
+        description="Lunch",
+        time=date(2026, 11, 11)
+    )
+
+    with pytest.raises(Exception, match="Simulated Database Failure"):
+        create_expense_service(expense, db)
+
+    db.rollback.assert_called_once()

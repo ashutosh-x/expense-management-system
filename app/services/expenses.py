@@ -4,10 +4,15 @@ from app.schemas.expense import ExpenseCreate
 
 def create_expense_service(expense: ExpenseCreate, db: Session):
     new_expense = Expense(**expense.model_dump())
-    db.add(new_expense)
-    db.commit()
-    db.refresh(new_expense)
-    return new_expense
+
+    try:
+        db.add(new_expense)
+        db.commit()
+        db.refresh(new_expense)
+        return new_expense
+    except Exception:
+        db.rollback()
+        raise
 
 def get_expense_by_id_service(expense_id: int, db: Session):
     return db.query(Expense).filter(Expense.id == expense_id).first()
